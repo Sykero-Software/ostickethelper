@@ -80,11 +80,8 @@ def list_tickets(ctx, status: str, user: Optional[str]) -> None:
             output = format_ticket_list(tickets, fmt_strings)
             click.echo(output)
 
-    except FileNotFoundError as e:
-        click.echo(f"{strings.get('cli', {}).get('error', 'Error')}: {e}", err=True)
-        sys.exit(1)
     except Exception as e:
-        click.echo(f"{strings.get('cli', {}).get('error', 'Error')}: {e}", err=True)
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 
@@ -164,11 +161,8 @@ def read(ctx, ticket_ids: tuple[str, ...], no_download: bool, no_pdf: bool,
             click.echo("", err=True)
             click.echo("\n\n".join(all_outputs))
 
-    except FileNotFoundError as e:
-        click.echo(f"{strings.get('cli', {}).get('error', 'Error')}: {e}", err=True)
-        sys.exit(1)
     except Exception as e:
-        click.echo(f"{strings.get('cli', {}).get('error', 'Error')}: {e}", err=True)
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 
@@ -209,11 +203,8 @@ def resolve(ctx, ticket_ids: tuple[str, ...], message: str) -> None:
             output = format_resolve_result(list(ticket_ids), results, message, fmt_strings)
             click.echo(output)
 
-    except FileNotFoundError as e:
-        click.echo(f"{strings.get('cli', {}).get('error', 'Error')}: {e}", err=True)
-        sys.exit(1)
     except Exception as e:
-        click.echo(f"{strings.get('cli', {}).get('error', 'Error')}: {e}", err=True)
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 
