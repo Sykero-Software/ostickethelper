@@ -374,7 +374,9 @@ class OSTicketBrowser:
             page.wait_for_selector('textarea#response', state='attached', timeout=10000)
             page.evaluate(
                 '''(msg) => {
-                    const html = '<p>' + msg + '</p>';
+                    const html = msg.split(/\\n\\n+/).map(
+                        p => '<p>' + p.replace(/\\n/g, '<br>') + '</p>'
+                    ).join('');
                     const r = $('textarea#response').data('redactor');
                     r.source.setCode(html);
                     $('textarea#response').val(html);
