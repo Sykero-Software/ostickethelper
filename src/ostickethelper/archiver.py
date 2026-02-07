@@ -273,6 +273,7 @@ def generate_typst_source(
 
     ticket_id = ticket_data["id"]
     ticket_number = ticket_data.get("number", "")
+    ticket_url = ticket_data.get("url", "")
     user_name = ticket_data["user"]["name"]
     created_str = ticket_data["created"]
     subject = ticket_data.get("subject", "")
@@ -336,6 +337,7 @@ def generate_typst_source(
         title_block=title_block,
         ticket_id=ticket_id,
         ticket_number=ticket_number,
+        ticket_url=ticket_url,
         logo_block=logo_block,
         subject=subject_esc,
         user_name=user_name_esc,

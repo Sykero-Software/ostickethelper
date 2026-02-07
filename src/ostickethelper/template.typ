@@ -1,6 +1,8 @@
 #set document(title: "$document_title")
 #set page(paper: "a4", margin: (x: 2.5cm, y: 2cm))
 #set text(font: "Liberation Sans", size: 11pt, lang: "$lang")
+#show link: underline
+#show link: set text(fill: rgb("#0000EE"))
 
 #align(center)[
   $logo_block
@@ -14,7 +16,7 @@
 
 #table(
   columns: (auto, 1fr), stroke: none, inset: 4pt,
-  [*$lbl_ticket:*], [\#$ticket_id ($ticket_number)],
+  [*$lbl_ticket:*], [#link("$ticket_url")[\#$ticket_id ($ticket_number)]],
   [*$lbl_subject:*], [$subject],
   [*$lbl_sender:*], [$user_name],
   [*$lbl_created:*], [$date_display],

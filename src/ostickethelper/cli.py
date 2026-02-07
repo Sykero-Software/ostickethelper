@@ -98,12 +98,6 @@ def list_tickets(ctx, status: str, user: Optional[str]) -> None:
 @cli.command()
 @click.argument("ticket_ids", nargs=-1, required=True)
 @click.option(
-    "--no-download",
-    is_flag=True,
-    default=False,
-    help="Don't download attachments, just show ticket info.",
-)
-@click.option(
     "--no-pdf",
     is_flag=True,
     default=False,
@@ -116,7 +110,7 @@ def list_tickets(ctx, status: str, user: Optional[str]) -> None:
     help="Overwrite existing PDF receipt.",
 )
 @click.pass_context
-def read(ctx, ticket_ids: tuple[str, ...], no_download: bool, no_pdf: bool,
+def read(ctx, ticket_ids: tuple[str, ...], no_pdf: bool,
          force: bool) -> None:
     """
     Read one or more tickets, download attachments, and generate PDF receipts.
@@ -148,7 +142,7 @@ def read(ctx, ticket_ids: tuple[str, ...], no_download: bool, no_pdf: bool,
                 ticket = browser.read_ticket(tid)
 
                 downloaded_files = []
-                if not no_download and ticket.attachments:
+                if ticket.attachments:
                     click.echo(
                         cli_strings.get("downloading", "Downloading {count} attachments...").format(
                             count=len(ticket.attachments)
@@ -160,7 +154,7 @@ def read(ctx, ticket_ids: tuple[str, ...], no_download: bool, no_pdf: bool,
                 all_outputs.append(format_ticket_detail(ticket, fmt_strings, downloaded_files))
 
                 # Generate PDF receipt to inbox
-                if not no_download and not no_pdf:
+                if not no_pdf:
                     click.echo(cli_strings.get("generating", "Generating receipt..."), err=True)
                     try:
                         result = generate_receipt_pdf(tid, app_config.osticket, strings, force=force)
