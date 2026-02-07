@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import uuid
 from datetime import datetime, date
 from pathlib import Path
@@ -303,6 +304,8 @@ def generate_typst_source(
             att_lines.append(f"+ {name} ({orig_size} → {comp_size}, {archiver_strings.get('compressed', 'compressed')})")
         elif att["type"] == "pdf":
             att_lines.append(f"+ {name} ({orig_size}, {archiver_strings.get('original', 'original')})")
+        elif att["type"] == "error":
+            att_lines.append(f"+ {name} ({orig_size}, {archiver_strings.get('unreadable', 'unreadable image')})")
         else:
             att_lines.append(f"+ {name} ({orig_size})")
 
@@ -516,9 +519,21 @@ def generate_receipt_pdf(
             elif _is_image_file(att_path):
                 # Image — compress and convert to PDF page
                 img_pdf_path = work_dir / f"{att_name}.pdf"
-                original_size, compressed_size = compress_image_to_pdf(
-                    att_path, img_pdf_path, max_width, jpeg_quality
-                )
+                try:
+                    original_size, compressed_size = compress_image_to_pdf(
+                        att_path, img_pdf_path, max_width, jpeg_quality
+                    )
+                except Exception as e:
+                    # Corrupt or unreadable image — skip but record in attachments
+                    print(f"Warning: cannot process image {att_name}: {e}", file=sys.stderr)
+                    original_size = att_path.stat().st_size
+                    attachments_info.append({
+                        "name": att_name,
+                        "original_size": original_size,
+                        "compressed_size": None,
+                        "type": "error",
+                    })
+                    continue
                 attachments_info.append({
                     "name": att_name,
                     "original_size": original_size,
