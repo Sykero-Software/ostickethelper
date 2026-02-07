@@ -1,6 +1,18 @@
 # OSTicket Helper
 
-A CLI tool for managing OSTicket tickets via browser automation. Supports listing, reading (with attachment download and PDF receipt generation), and resolving tickets.
+A CLI tool for managing [OSTicket](https://osticket.com/) tickets via browser automation. Supports listing, reading (with attachment download and PDF receipt generation), and resolving tickets.
+
+## How it works
+
+OSTicket does not provide a public REST API for agent operations (listing, reading, and resolving tickets). This tool works around that limitation by automating the staff control panel (SCP) web interface using [Playwright](https://playwright.dev/python/) (headless Chromium).
+
+This approach has trade-offs compared to a proper API:
+
+- **Fragile**: UI changes in OSTicket updates may break the scraping logic.
+- **Slower**: each operation involves full page loads and DOM parsing.
+- **Auth**: login is done via form submission with username/password (no token-based auth).
+
+Tested and working with **OSTicket 1.17.5**. Other versions may work but are not guaranteed.
 
 ## Features
 
