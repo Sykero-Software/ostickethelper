@@ -8,7 +8,9 @@ Usage:
     ostickethelper resolve 656694 --message "Paid"
 """
 
+import json
 import sys
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -150,6 +152,27 @@ def read(ctx, ticket_ids: tuple[str, ...], no_pdf: bool,
                         err=True,
                     )
                     downloaded_files = browser.download_attachments(ticket)
+
+                # Always save ticket.json to inbox (needed for PDF receipt generation)
+                ticket_inbox_dir = Path(app_config.osticket.inbox_dir) / str(tid)
+                ticket_inbox_dir.mkdir(parents=True, exist_ok=True)
+                ticket_json_path = ticket_inbox_dir / "ticket.json"
+                metadata = {
+                    "id": ticket.id,
+                    "number": ticket.number,
+                    "url": ticket.url,
+                    "subject": ticket.subject,
+                    "user": {
+                        "name": ticket.user_name,
+                        "email": ticket.user_email,
+                    },
+                    "created": ticket.created,
+                    "status": ticket.status,
+                    "message": ticket.message,
+                    "attachments": [att.name for att in ticket.attachments],
+                }
+                with open(ticket_json_path, "w", encoding="utf-8") as f:
+                    json.dump(metadata, f, indent=2, ensure_ascii=False)
 
                 all_outputs.append(format_ticket_detail(ticket, fmt_strings, downloaded_files))
 
