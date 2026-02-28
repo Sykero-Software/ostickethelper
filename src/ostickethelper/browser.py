@@ -2,6 +2,7 @@
 
 import json
 import time
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -284,6 +285,19 @@ class OSTicketBrowser:
 
         return attachments
 
+    def _get_cookie_header(self, url: str) -> str:
+        """Get Cookie header string from Playwright session for the given URL."""
+        cookies = self._context.cookies(url)
+        return "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+
+    def _download_binary(self, url: str) -> bytes:
+        """Download URL using urllib with cookies from Playwright session."""
+        req = urllib.request.Request(url)
+        req.add_header("Cookie", self._get_cookie_header(url))
+        req.add_header("Accept-Encoding", "identity")
+        with urllib.request.urlopen(req) as resp:
+            return resp.read()
+
     def download_attachments(self, ticket: Ticket, download_dir: Optional[str] = None) -> list[str]:
         """
         Download all attachments from a ticket.
@@ -305,7 +319,6 @@ class OSTicketBrowser:
 
         download_dir.mkdir(parents=True, exist_ok=True)
 
-        page = self._page
         downloaded = []
 
         for att in ticket.attachments:
@@ -320,9 +333,15 @@ class OSTicketBrowser:
             file_path = download_dir / safe_name
 
             try:
-                # Use direct HTTP request - works for both attachments and inline images
-                response = page.request.get(full_url)
-                file_path.write_bytes(response.body())
+                data = self._download_binary(full_url)
+
+                # Validate .gz files: must start with gzip magic bytes.
+                # Server-side corruption (OSTicket charset bug) can produce
+                # invalid files; warn so the user knows to check Gmail instead.
+                if safe_name.endswith(".gz") and data[:2] != b'\x1f\x8b':
+                    print(f"Warning: {att.name} is not valid gzip (server-side corruption, check Gmail for original)")
+
+                file_path.write_bytes(data)
                 downloaded.append(str(file_path))
             except Exception as e:
                 print(f"Warning: Failed to download {att.name}: {e}")
