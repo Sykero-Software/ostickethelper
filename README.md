@@ -164,6 +164,10 @@ action failed. Each outcome is printed as soon as it is known: `OK`, `FAILED`, o
 but not confirmed, so it may have been sent). Actions are not idempotent: before re-running a file,
 remove the items that succeeded and check the `UNKNOWN` tickets, or users get duplicate replies.
 
+Messages are plain text. osTicket strips anything that looks like an HTML tag, even when escaped, so
+the tool puts an invisible zero-width space after a `<` that would start a tag (`List<String>` stays
+readable).
+
 `--no-headless` is a global option (place it before the subcommand) that runs Chromium with a visible window — useful for debugging when the SCP scraping breaks after an OSTicket update:
 
 ```bash

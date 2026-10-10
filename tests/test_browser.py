@@ -71,8 +71,17 @@ def test_internal_note_opens_note_tab_and_posts_note(tmp_path):
 
 def test_message_html_escapes_markup_and_keeps_paragraphs():
     from ostickethelper.browser import message_html
-    assert message_html("Fixed List<String> & <b>\nline 2\n\n\nnext") == (
-        "<p>Fixed List&lt;String&gt; &amp; &lt;b&gt;<br>line 2</p><p>next</p>"
+    assert message_html("a & b, 1 < 2\nline 2\n\n\nnext") == (
+        "<p>a &amp; b, 1 &lt; 2<br>line 2</p><p>next</p>"
+    )
+
+
+def test_message_html_breaks_tag_lookalikes_with_zero_width_space():
+    # osTicket decodes entities repeatedly before stripping tags, so escaping alone loses
+    # "<String>"; a zero-width space after "<" keeps it from looking like a tag.
+    from ostickethelper.browser import message_html
+    assert message_html("List<String> </b> <!x> <?p") == (
+        "<p>List&lt;\u200bString&gt; &lt;\u200b/b&gt; &lt;\u200b!x&gt; &lt;\u200b?p</p>"
     )
 
 

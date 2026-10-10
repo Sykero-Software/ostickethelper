@@ -19,8 +19,18 @@ class SubmitUnconfirmedError(Exception):
     """The form was submitted but success was not confirmed: the post may or may not exist."""
 
 
+# "<" that would start a tag: a letter, "/", "!" or "?" follows it.
+_TAG_START = re.compile(r"<(?=[A-Za-z/!?])")
+
+
 def message_html(message: str) -> str:
-    """Plain text to editor HTML: escaped, blank lines split paragraphs, newlines become <br>."""
+    """
+    Plain text to editor HTML: escaped, blank lines split paragraphs, newlines become <br>.
+
+    osTicket decodes entities repeatedly before stripping tags, so an escaped "&lt;String&gt;"
+    still disappears. A zero-width space after a tag-starting "<" keeps such text intact.
+    """
+    message = _TAG_START.sub("<\u200b", message)
     paragraphs = re.split(r"\n\n+", message)
     return "".join(
         "<p>" + "<br>".join(html.escape(line, quote=False) for line in p.split("\n")) + "</p>"
