@@ -160,7 +160,9 @@ any number of actions in one login. The file is a YAML list:
 
 `ticket` is the internal ID (as in `tickets.php?id=...`). The whole file is validated before logging
 in, so a typo never costs a login. A failing action does not stop the rest; the exit code is 1 if any
-action failed.
+action failed. Each outcome is printed as soon as it is known: `OK`, `FAILED`, or `UNKNOWN` (submitted
+but not confirmed, so it may have been sent). Actions are not idempotent: before re-running a file,
+remove the items that succeeded and check the `UNKNOWN` tickets, or users get duplicate replies.
 
 `--no-headless` is a global option (place it before the subcommand) that runs Chromium with a visible window — useful for debugging when the SCP scraping breaks after an OSTicket update:
 

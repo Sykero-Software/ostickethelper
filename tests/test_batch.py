@@ -164,3 +164,66 @@ class TestBatchCommand:
         result, _, _ = self._invoke(tmp_path, self.VALID, browser=FakeBrowser(fail={"2"}))
         assert result.exit_code == 1
         assert "FAILED" in result.output
+
+
+class TestLoadActionsStrictness:
+    def test_ticket_must_be_a_numeric_id(self, tmp_path):
+        path = _write(tmp_path, """
+- {ticket: abc, action: reply, message: x}
+- {ticket: true, action: reply, message: x}
+- {ticket: 12.5, action: reply, message: x}
+- {ticket: "42", action: reply, message: x}
+""")
+        with pytest.raises(ValueError) as exc:
+            load_actions(path)
+        text = str(exc.value)
+        assert "item 1" in text and "item 2" in text and "item 3" in text
+        assert "item 4" not in text
+
+    def test_non_string_message_says_to_quote_it(self, tmp_path):
+        path = _write(tmp_path, "- {ticket: 1, action: reply, message: yes}\n")
+        with pytest.raises(ValueError, match="quote"):
+            load_actions(path)
+
+
+class TestRunBatchReporting:
+    def test_reports_each_outcome_as_it_happens(self):
+        seen = []
+        browser = FakeBrowser(fail={"2"})
+        run_batch(browser, [BatchAction("1", "reply", "a"), BatchAction("2", "note", "b")],
+                  on_done=lambda r: seen.append((r.action.ticket, r.ok, len(browser.calls))))
+        assert seen == [("1", True, 1), ("2", False, 2)]
+
+    def test_unconfirmed_submit_is_marked_as_unknown_state(self):
+        from ostickethelper.browser import SubmitUnconfirmedError
+
+        class SlowBrowser(FakeBrowser):
+            def reply_ticket(self, ticket_id, message, status=None):
+                raise SubmitUnconfirmedError("no navigation")
+
+        [result] = run_batch(SlowBrowser(), [BatchAction("1", "resolve", "a")])
+        assert not result.ok
+        assert result.unknown
+        [plain] = run_batch(FakeBrowser(explode={"1"}), [BatchAction("1", "resolve", "a")])
+        assert not plain.unknown
+
+
+class TestBatchCommandInterrupted:
+    def test_results_are_printed_even_if_closing_the_browser_fails(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+        from click.testing import CliRunner
+        from ostickethelper.cli import cli
+
+        path = _write(tmp_path, TestBatchCommand.VALID)
+        browser_cls = MagicMock()
+        browser_cls.return_value.__enter__.return_value = FakeBrowser()
+        browser_cls.return_value.__exit__.side_effect = RuntimeError("close failed")
+        load_config = MagicMock()
+        load_config.return_value.strings = {}
+        with patch("ostickethelper.cli.load_config", load_config), \
+                patch("ostickethelper.cli.OSTicketBrowser", browser_cls):
+            result = CliRunner().invoke(cli, ["batch", str(path)])
+        assert result.exit_code == 1
+        assert "OK resolve #1" in result.output
+        assert "OK note #2" in result.output
+        assert "close failed" in result.output

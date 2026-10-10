@@ -278,10 +278,22 @@ def batch(ctx, actions_file: str, dry_run: bool) -> None:
         click.echo(format_batch_plan(actions, {}))
         return
 
+    results = []
+    fmt_strings = {}
+
+    def report(result):
+        # Report each outcome at once: if the run is interrupted, what was sent is still known.
+        results.append(result)
+        label = "OK" if result.ok else ("UNKNOWN" if result.unknown else "FAILED")
+        detail = f": {result.error}" if result.error else ""
+        click.echo(f"  {label}{detail}", err=True)
+
+    failed = False
     try:
         app_config = load_config(ctx.obj["config_path"])
         strings = app_config.strings
         cli_strings = strings.get("cli", {})
+        fmt_strings = strings.get("formatter", {})
 
         if ctx.obj["no_headless"]:
             app_config.osticket.headless = False
@@ -289,20 +301,21 @@ def batch(ctx, actions_file: str, dry_run: bool) -> None:
         click.echo(cli_strings.get("logging_in", "Logging in to OSTicket..."), err=True)
 
         with OSTicketBrowser(app_config.osticket) as browser:
-            results = run_batch(
+            run_batch(
                 browser, actions,
                 on_start=lambda a: click.echo(f"{a.action} #{a.ticket}...", err=True),
+                on_done=report,
             )
-
-        click.echo("", err=True)
-        click.echo(format_batch_result(results, strings.get("formatter", {})))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+        failed = True
+    finally:
+        if results:
+            click.echo("", err=True)
+            click.echo(format_batch_result(results, fmt_strings))
 
-    if not all(r.ok for r in results):
+    if failed or len(results) < len(actions) or not all(r.ok for r in results):
         sys.exit(1)
-
 
 if __name__ == "__main__":
     cli()

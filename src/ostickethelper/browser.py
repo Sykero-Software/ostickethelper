@@ -1,6 +1,8 @@
 """Playwright-based browser automation for OSTicket."""
 
+import html
 import json
+import re
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -8,8 +10,22 @@ from pathlib import Path
 from typing import Optional
 
 from playwright.sync_api import Page, sync_playwright, Browser, BrowserContext
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from ostickethelper.config import OSTicketConfig
+
+
+class SubmitUnconfirmedError(Exception):
+    """The form was submitted but success was not confirmed: the post may or may not exist."""
+
+
+def message_html(message: str) -> str:
+    """Plain text to editor HTML: escaped, blank lines split paragraphs, newlines become <br>."""
+    paragraphs = re.split(r"\n\n+", message)
+    return "".join(
+        "<p>" + "<br>".join(html.escape(line, quote=False) for line in p.split("\n")) + "</p>"
+        for p in paragraphs
+    )
 
 
 @dataclass
@@ -453,15 +469,12 @@ class OSTicketBrowser:
         page = self._page
         page.wait_for_selector(selector, state="attached", timeout=10000)
         page.evaluate(
-            '''({selector, message}) => {
-                const html = message.split(/\\n\\n+/).map(
-                    p => '<p>' + p.replace(/\\n/g, '<br>') + '</p>'
-                ).join('');
+            '''({selector, html}) => {
                 const r = $(selector).data('redactor');
                 r.source.setCode(html);
                 $(selector).val(html);
             }''',
-            {"selector": selector, "message": message},
+            {"selector": selector, "html": message_html(message)},
         )
 
     def _submit(self, button_name: str) -> None:
@@ -471,7 +484,12 @@ class OSTicketBrowser:
         page = self._page
         ticket_url = page.url
         page.get_by_role("button", name=button_name).click()
-        page.wait_for_function(
-            f'() => window.location.href !== "{ticket_url}"',
-            timeout=30000,
-        )
+        try:
+            page.wait_for_function(
+                f'() => window.location.href !== "{ticket_url}"',
+                timeout=30000,
+            )
+        except (PlaywrightTimeoutError, TimeoutError) as e:
+            raise SubmitUnconfirmedError(
+                f"submitted, but success was not confirmed ({e}); check the ticket before retrying"
+            ) from e

@@ -53,13 +53,6 @@ def test_reply_with_status_selects_it_in_reply_form(tmp_path):
     page.locator.return_value.select_option.assert_called_once_with(["Closed"])
 
 
-def test_reply_raises_when_post_fails(tmp_path):
-    browser, page = _browser_with_page(tmp_path)
-    page.wait_for_function.side_effect = TimeoutError("no navigation")
-    with pytest.raises(TimeoutError):
-        browser.reply_ticket("7", "hi")
-
-
 def test_resolve_ticket_still_returns_false_on_failure(tmp_path):
     browser, page = _browser_with_page(tmp_path)
     page.wait_for_function.side_effect = TimeoutError("no navigation")
@@ -71,6 +64,28 @@ def test_internal_note_opens_note_tab_and_posts_note(tmp_path):
     assert browser.post_internal_note("7", "fixed in abc") is True
     page.click.assert_any_call("#post-note-tab")
     page.wait_for_selector.assert_any_call("textarea#internal_note", state="attached", timeout=10000)
-    assert page.evaluate.call_args.args[1] == {"selector": "textarea#internal_note", "message": "fixed in abc"}
+    assert page.evaluate.call_args.args[1] == {"selector": "textarea#internal_note", "html": "<p>fixed in abc</p>"}
     page.locator.return_value.select_option.assert_not_called()
     page.get_by_role.assert_called_with("button", name="Post Note")
+
+
+def test_message_html_escapes_markup_and_keeps_paragraphs():
+    from ostickethelper.browser import message_html
+    assert message_html("Fixed List<String> & <b>\nline 2\n\n\nnext") == (
+        "<p>Fixed List&lt;String&gt; &amp; &lt;b&gt;<br>line 2</p><p>next</p>"
+    )
+
+
+def test_submit_timeout_is_reported_as_unconfirmed(tmp_path):
+    from ostickethelper.browser import SubmitUnconfirmedError
+    browser, page = _browser_with_page(tmp_path)
+    page.wait_for_function.side_effect = TimeoutError("no navigation")
+    with pytest.raises(SubmitUnconfirmedError):
+        browser.reply_ticket("7", "hi")
+
+
+def test_note_tab_is_opened_before_the_note_is_filled(tmp_path):
+    browser, page = _browser_with_page(tmp_path)
+    browser.post_internal_note("7", "x")
+    names = [c[0] for c in page.method_calls]
+    assert names.index("click") < names.index("evaluate")

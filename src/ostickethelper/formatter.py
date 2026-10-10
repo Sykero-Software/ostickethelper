@@ -159,7 +159,8 @@ def format_batch_result(results: list, strings: dict) -> str:
     """Format batch results: one OK/FAILED line per action, then a summary."""
     lines = [f"## {strings.get('batch_header', 'Batch results')}", ""]
     for r in results:
-        line = f"- {'OK' if r.ok else 'FAILED'} {_batch_line(r.action)}"
+        label = "OK" if r.ok else ("UNKNOWN" if r.unknown else "FAILED")
+        line = f"- {label} {_batch_line(r.action)}"
         if r.error:
             line += f" ({r.error})"
         lines.append(line)
