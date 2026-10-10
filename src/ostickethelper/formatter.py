@@ -140,3 +140,31 @@ def format_resolve_result(ticket_ids: list[str], success: list[bool], message: s
         lines.append(summary_str.format(succeeded=succeeded, failed=failed))
 
     return "\n".join(lines)
+
+
+def _batch_line(action) -> str:
+    first_line = action.message.splitlines()[0]
+    more = " …" if "\n" in action.message else ""
+    return f"{action.action} #{action.ticket}: {first_line}{more}"
+
+
+def format_batch_plan(actions: list, strings: dict) -> str:
+    """Format the actions a batch would run (for --dry-run)."""
+    lines = [f"## {strings.get('batch_plan_header', 'Batch plan (dry run, nothing sent)')}", ""]
+    lines += [f"{i}. {_batch_line(a)}" for i, a in enumerate(actions, start=1)]
+    return "\n".join(lines)
+
+
+def format_batch_result(results: list, strings: dict) -> str:
+    """Format batch results: one OK/FAILED line per action, then a summary."""
+    lines = [f"## {strings.get('batch_header', 'Batch results')}", ""]
+    for r in results:
+        line = f"- {'OK' if r.ok else 'FAILED'} {_batch_line(r.action)}"
+        if r.error:
+            line += f" ({r.error})"
+        lines.append(line)
+    succeeded = sum(r.ok for r in results)
+    lines.append("")
+    lines.append(strings.get("batch_summary", "Succeeded: {succeeded}, failed: {failed}").format(
+        succeeded=succeeded, failed=len(results) - succeeded))
+    return "\n".join(lines)

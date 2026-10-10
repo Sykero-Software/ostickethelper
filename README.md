@@ -19,6 +19,7 @@ Tested and working with **OSTicket 1.17.5**. Other versions may work but are not
 - **List** open/closed tickets, grouped by user
 - **Read** tickets: download attachments, generate a combined PDF receipt (Typst summary page + attachment pages)
 - **Resolve** tickets with a message
+- **Batch** replies, resolves, closes and internal notes in one login (one password decryption)
 - **Fully localizable**: all user-facing strings are configurable via YAML
 
 ## Requirements
@@ -128,7 +129,38 @@ ostickethelper --config config.yaml read 339 --force
 
 # Resolve tickets
 ostickethelper --config config.yaml resolve 339 340 --message "Paid"
+
+# Run many actions with a single login
+ostickethelper --config config.yaml batch actions.yaml --dry-run   # validate, print plan
+ostickethelper --config config.yaml batch actions.yaml
 ```
+
+### Batch file
+
+Each login decrypts the password once, which with a GPG hardware key means one touch. `batch` runs
+any number of actions in one login. The file is a YAML list:
+
+```yaml
+- ticket: 339
+  action: resolve          # reply + status Resolved
+  message: |
+    Fixed in version 1.2.3.
+
+    Thanks for the report!
+- ticket: 340
+  action: reply            # reply, status unchanged
+  message: "Which version are you using?"
+- ticket: 341
+  action: close            # reply + status Closed
+  message: "Closing as duplicate of #339."
+- ticket: 342
+  action: note             # internal note, not emailed to the user
+  message: "Root cause found, fix pending."
+```
+
+`ticket` is the internal ID (as in `tickets.php?id=...`). The whole file is validated before logging
+in, so a typo never costs a login. A failing action does not stop the rest; the exit code is 1 if any
+action failed.
 
 `--no-headless` is a global option (place it before the subcommand) that runs Chromium with a visible window — useful for debugging when the SCP scraping breaks after an OSTicket update:
 

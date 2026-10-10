@@ -385,53 +385,93 @@ class OSTicketBrowser:
         Returns:
             True if successful, False otherwise.
         """
-        page = self._page
+        try:
+            return self.reply_ticket(ticket_id, message, status="Resolved")
+        except Exception as e:
+            print(f"Error resolving ticket: {e}")
+            return False
+
+    def reply_ticket(self, ticket_id: str, message: str, status: Optional[str] = None) -> bool:
+        """
+        Post a reply (emailed to the user), optionally changing the ticket status.
+
+        Args:
+            ticket_id: The ticket ID.
+            message: Reply text; blank lines separate paragraphs.
+            status: Status option label ("Resolved", "Closed"); None keeps the current status.
+
+        Returns:
+            True once the reply is posted.
+
+        Raises:
+            Exception: if the form cannot be filled or the post does not complete.
+        """
+        self._open_ticket(ticket_id)
+        self._fill_richtext("textarea#response", message)
+        if status:
+            # The status select defaults to the current status, so leaving it alone keeps it.
+            self._page.locator('select[name="reply_status_id"]').select_option([status])
+        self._submit("Post Reply")
+        return True
+
+    def post_internal_note(self, ticket_id: str, message: str) -> bool:
+        """
+        Post an internal note: visible to agents only, not emailed to the user.
+
+        Returns:
+            True once the note is posted.
+
+        Raises:
+            Exception: if the form cannot be filled or the post does not complete.
+        """
+        self._open_ticket(ticket_id)
+        # The note form lives in a hidden tab; its submit button is clickable only once shown.
+        self._page.click("#post-note-tab")
+        self._fill_richtext("textarea#internal_note", message)
+        self._submit("Post Note")
+        return True
+
+    def _open_ticket(self, ticket_id: str) -> None:
         # Wait only for the DOM to be parsed, not the full "load" event. As with
         # read_ticket(), slow/non-essential subresources (analytics, long-polling)
         # can prevent "load" from firing within the timeout on support.andbible.org.
-        page.goto(
+        self._page.goto(
             f"{self.config.url}/scp/tickets.php?id={ticket_id}",
             wait_until="domcontentloaded",
         )
         time.sleep(0.5)
 
-        try:
-            # Don't wait for "networkidle" — long-polling/analytics keep the
-            # network busy, so it never settles within the timeout. The explicit
-            # wait_for_selector below is the actual readiness check we need.
+    def _fill_richtext(self, selector: str, message: str) -> None:
+        # Don't wait for "networkidle" — long-polling/analytics keep the
+        # network busy, so it never settles within the timeout. The explicit
+        # wait_for_selector below is the actual readiness check we need.
+        #
+        # Set the message via the Redactor editor API. Redactor stores content
+        # in a contenteditable div but validates against the hidden textarea.
+        # source.setCode() only updates the editor, so we must also set the
+        # textarea value directly.
+        page = self._page
+        page.wait_for_selector(selector, state="attached", timeout=10000)
+        page.evaluate(
+            '''({selector, message}) => {
+                const html = message.split(/\\n\\n+/).map(
+                    p => '<p>' + p.replace(/\\n/g, '<br>') + '</p>'
+                ).join('');
+                const r = $(selector).data('redactor');
+                r.source.setCode(html);
+                $(selector).val(html);
+            }''',
+            {"selector": selector, "message": message},
+        )
 
-            # Set reply message via Redactor editor API.
-            # Redactor stores content in a contenteditable div but validates
-            # against the hidden textarea. source.setCode() only updates the
-            # editor, so we must also set the textarea value directly.
-            page.wait_for_selector('textarea#response', state='attached', timeout=10000)
-            page.evaluate(
-                '''(msg) => {
-                    const html = msg.split(/\\n\\n+/).map(
-                        p => '<p>' + p.replace(/\\n/g, '<br>') + '</p>'
-                    ).join('');
-                    const r = $('textarea#response').data('redactor');
-                    r.source.setCode(html);
-                    $('textarea#response').val(html);
-                }''',
-                message,
-            )
-
-            # Change status to Resolved (use list for selectOption)
-            page.locator('select[name="reply_status_id"]').select_option(["Resolved"])
-
-            # Submit the reply and wait for navigation away from ticket page.
-            # After success, URL changes from tickets.php?id=X to e.g.
-            # tickets.php#reply or tickets.php?queue=1.
-            ticket_url = page.url
-            page.get_by_role("button", name="Post Reply").click()
-            page.wait_for_function(
-                f'() => window.location.href !== "{ticket_url}"',
-                timeout=30000,
-            )
-
-            return True
-
-        except Exception as e:
-            print(f"Error resolving ticket: {e}")
-            return False
+    def _submit(self, button_name: str) -> None:
+        # Submit and wait for navigation away from the ticket page. After
+        # success, the URL changes from tickets.php?id=X to e.g.
+        # tickets.php#reply or tickets.php?queue=1.
+        page = self._page
+        ticket_url = page.url
+        page.get_by_role("button", name=button_name).click()
+        page.wait_for_function(
+            f'() => window.location.href !== "{ticket_url}"',
+            timeout=30000,
+        )

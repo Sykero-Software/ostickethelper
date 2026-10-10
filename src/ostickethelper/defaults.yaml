@@ -54,3 +54,6 @@ strings:
     resolve_header: "Ticket resolution"
     all_resolved: "All {count} tickets resolved successfully."
     resolve_summary: "Resolved: {succeeded}, failed: {failed}"
+    batch_plan_header: "Batch plan (dry run, nothing sent)"
+    batch_header: "Batch results"
+    batch_summary: "Succeeded: {succeeded}, failed: {failed}"

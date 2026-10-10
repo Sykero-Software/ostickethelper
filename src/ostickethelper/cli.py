@@ -6,6 +6,7 @@ Usage:
     ostickethelper list
     ostickethelper read 656694
     ostickethelper resolve 656694 --message "Paid"
+    ostickethelper batch actions.yaml
 """
 
 import json
@@ -17,7 +18,10 @@ import click
 
 from ostickethelper.archiver import generate_receipt_pdf
 from ostickethelper.config import load_config
-from ostickethelper.formatter import format_ticket_list, format_ticket_detail, format_resolve_result
+from ostickethelper.batch import load_actions, run_batch
+from ostickethelper.formatter import (
+    format_batch_plan, format_batch_result, format_resolve_result, format_ticket_detail, format_ticket_list,
+)
 from ostickethelper.browser import OSTicketBrowser
 
 
@@ -238,6 +242,65 @@ def resolve(ctx, ticket_ids: tuple[str, ...], message: str) -> None:
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("actions_file", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Validate the file and print the plan without logging in.",
+)
+@click.pass_context
+def batch(ctx, actions_file: str, dry_run: bool) -> None:
+    """
+    Run many ticket actions with a single login (one password decryption).
+
+    ACTIONS_FILE is a YAML list of {ticket, action, message} items, where action is
+    reply (status unchanged), resolve, close, or note (internal, not sent to the user).
+    The whole file is validated before logging in. A failing action does not stop
+    the batch; the exit code is 1 if any action failed.
+
+    Examples:
+        ostickethelper batch actions.yaml --dry-run
+        ostickethelper batch actions.yaml
+    """
+    # Validate first: load_config() may decrypt the password (e.g. a GPG hardware key touch).
+    try:
+        actions = load_actions(Path(actions_file))
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    if dry_run:
+        click.echo(format_batch_plan(actions, {}))
+        return
+
+    try:
+        app_config = load_config(ctx.obj["config_path"])
+        strings = app_config.strings
+        cli_strings = strings.get("cli", {})
+
+        if ctx.obj["no_headless"]:
+            app_config.osticket.headless = False
+
+        click.echo(cli_strings.get("logging_in", "Logging in to OSTicket..."), err=True)
+
+        with OSTicketBrowser(app_config.osticket) as browser:
+            results = run_batch(
+                browser, actions,
+                on_start=lambda a: click.echo(f"{a.action} #{a.ticket}...", err=True),
+            )
+
+        click.echo("", err=True)
+        click.echo(format_batch_result(results, strings.get("formatter", {})))
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    if not all(r.ok for r in results):
         sys.exit(1)
 
 
