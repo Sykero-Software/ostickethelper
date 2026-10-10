@@ -25,7 +25,6 @@ class OSTicketConfig:
     # Playwright browser channel ("chrome", "msedge", ...); None = Playwright's bundled Chromium
     browser_channel: Optional[str] = None
     work_dir: Path = field(default_factory=lambda: Path.cwd())
-    receipts_dir: Path = field(default_factory=lambda: Path.cwd() / "receipts")
     temp_dir: Path = field(default_factory=lambda: Path.cwd() / ".tmp")
     logo_path: Optional[Path] = None
     template_path: Path = field(default_factory=lambda: Path(str(_PKG.joinpath("template.typ"))))
@@ -158,7 +157,6 @@ def load_config(config_path: Optional[str] = None, work_dir: Optional[Path] = No
 
     # Resolve paths relative to work_dir
     inbox_dir = resolved_work_dir / osticket_data.get("inbox_dir", "inbox/osticket")
-    receipts_dir = resolved_work_dir / osticket_data.get("receipts_dir", "receipts")
     temp_dir = resolved_work_dir / osticket_data.get("temp_dir", ".tmp")
 
     # Logo path: None if not specified
@@ -180,7 +178,6 @@ def load_config(config_path: Optional[str] = None, work_dir: Optional[Path] = No
         slow_mo=osticket_data.get("slow_mo", 0),
         browser_channel=osticket_data.get("browser_channel"),
         work_dir=resolved_work_dir,
-        receipts_dir=receipts_dir,
         temp_dir=temp_dir,
         logo_path=logo_path,
         template_path=template_path,

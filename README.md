@@ -1,10 +1,10 @@
 # OSTicket Helper
 
-A CLI tool for managing [OSTicket](https://osticket.com/) tickets via browser automation. Supports listing, reading (with attachment download and PDF receipt generation), and resolving tickets.
+A CLI tool for managing [OSTicket](https://osticket.com/) tickets via browser automation. Supports listing and reading tickets (with attachment download and PDF receipt generation), replying, resolving, closing, and internal notes, also many at once in a single login.
 
 ## How it works
 
-OSTicket does not provide a public REST API for agent operations (listing, reading, and resolving tickets). This tool works around that limitation by automating the staff control panel (SCP) web interface using [Playwright](https://playwright.dev/python/) (headless Chromium).
+OSTicket does not provide a public REST API for agent operations (listing, reading, replying to and resolving tickets). This tool works around that limitation by automating the staff control panel (SCP) web interface using [Playwright](https://playwright.dev/python/) (headless Chromium).
 
 This approach has trade-offs compared to a proper API:
 
@@ -25,38 +25,55 @@ Tested and working with **OSTicket 1.17.5**. Other versions may work but are not
 ## Requirements
 
 - Python 3.10+
-- [Poetry](https://python-poetry.org/)
-- [Playwright](https://playwright.dev/python/) (Chromium)
-- [Typst](https://typst.app/) (for PDF receipt generation)
-- GPG (for decrypting the password file)
+- A Chromium browser for [Playwright](https://playwright.dev/python/): either Playwright's own
+  (`playwright install chromium`) or an installed Google Chrome (`browser_channel: chrome`, see below)
+- [Typst](https://typst.app/), only for PDF receipts (`read` without `--no-pdf`)
+- GPG, only for a `.gpg` password file
 
 ## Installation
 
+As a command-line tool on your `PATH`, with [uv](https://docs.astral.sh/uv/) (or the same URL with
+`pipx install`):
+
+```bash
+uv tool install git+https://github.com/Sykero-Software/ostickethelper
+# Only if you don't use an installed Chrome (browser_channel: chrome):
+uv tool run --from git+https://github.com/Sykero-Software/ostickethelper playwright install chromium
+```
+
+For development, from a clone (uses [Poetry](https://python-poetry.org/)):
+
 ```bash
 poetry install
-playwright install chromium
+poetry run playwright install chromium
+poetry run pytest
 ```
 
 ## Configuration
 
-Create a YAML config file (see `src/ostickethelper/defaults.yaml` for all available keys):
+Create a YAML config file and pass it with `--config` on every run (there is no usable default
+location). `src/ostickethelper/defaults.yaml` holds the defaults:
 
 ```yaml
 osticket:
   url: "https://your-osticket-instance.com"
   username: "agent"
+  work_dir: "/home/me/osticket"         # optional: base for the relative paths below
   password: "your-password"              # option 1: direct password
   # secrets_file: "secrets/password.txt" # option 2: plain text file
   # secrets_file: "secrets/pw.txt.gpg"   # option 3: GPG-encrypted file
   headless: true
   slow_mo: 0
+  browser_channel: "chrome"             # optional: use the installed Chrome
   inbox_dir: "inbox/osticket"
   logo_path: "resources/logo.png"       # optional
   temp_dir: ".tmp"                      # optional, default: ".tmp"
   template_path: "my-template.typ"      # optional, default: built-in template
 ```
 
-All relative paths are resolved from the working directory (where you run the command).
+Relative paths (`secrets_file`, `inbox_dir`, `logo_path`, `temp_dir`, `template_path`) are resolved
+against `work_dir` if set, otherwise against the directory you run the command in. Set `work_dir` to
+run the tool from anywhere.
 
 ### Authentication
 
@@ -75,12 +92,13 @@ At least one of these must be configured.
 |-------|----------|-------------|
 | `url` | Yes | OSTicket base URL |
 | `username` | Yes | Agent username |
+| `work_dir` | No | Base directory for relative paths (default: the current directory) |
 | `password` | No* | Password (plain text in config) |
 | `secrets_file` | No* | Path to password file (plain text or `.gpg`) |
 | `headless` | No | Run browser headless (default: `true`) |
 | `slow_mo` | No | Slow down browser actions in ms (default: `0`) |
 | `browser_channel` | No | Use an installed browser instead of Playwright's Chromium, e.g. `chrome` (then `playwright install chromium` is not needed) |
-| `inbox_dir` | No | Directory for downloaded tickets (default: `inbox/osticket`) |
+| `inbox_dir` | No | Where `read` writes tickets, attachments and receipts (default: `inbox/osticket`) |
 | `logo_path` | No | Logo image for PDF receipts (omit for no logo) |
 | `temp_dir` | No | Temporary directory for Typst compilation (default: `.tmp`) |
 | `template_path` | No | Custom Typst template (default: built-in `template.typ`) |
@@ -108,6 +126,12 @@ Only override the strings you want to change; the rest will use English defaults
 
 ## Usage
 
+Tickets are addressed by their **internal ID**: the `[id=...]` that `list` prints, the same as in
+the staff URL `tickets.php?id=...`. It is not the ticket number shown in the web UI and in emails.
+
+Write commands (`resolve`, and `batch` actions other than `note`) email the ticket's user, just as
+replying in the web UI does.
+
 ```bash
 # List open tickets
 ostickethelper --config config.yaml list
@@ -118,7 +142,8 @@ ostickethelper --config config.yaml list --status closed
 # List only tickets from a specific user
 ostickethelper --config config.yaml list --user "John Doe"
 
-# Read tickets and generate PDF receipts
+# Read tickets: writes inbox_dir/<id>/ticket.json and attachments, and the PDF receipt
+# inbox_dir/<id>.pdf; prints the tickets
 ostickethelper --config config.yaml read 339 340
 
 # Read without generating PDF

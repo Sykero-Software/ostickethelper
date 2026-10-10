@@ -38,7 +38,6 @@ def make_config(tmp_path, logo=False):
         inbox_dir=str(tmp_path / "inbox"),
         slow_mo=0,
         work_dir=tmp_path,
-        receipts_dir=tmp_path / "receipts",
         temp_dir=tmp_path / "tmp",
         logo_path=logo_path,
         template_path=Path(str(files("ostickethelper").joinpath("template.typ"))),

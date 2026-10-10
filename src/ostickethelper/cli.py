@@ -3,10 +3,10 @@
 OSTicket Helper - CLI tool for managing OSTicket tickets.
 
 Usage:
-    ostickethelper list
-    ostickethelper read 656694
-    ostickethelper resolve 656694 --message "Paid"
-    ostickethelper batch actions.yaml
+    ostickethelper --config config.yaml list
+    ostickethelper --config config.yaml read 3295
+    ostickethelper --config config.yaml resolve 3295 --message "Paid"
+    ostickethelper --config config.yaml batch actions.yaml
 """
 
 import json
@@ -31,7 +31,7 @@ from ostickethelper.browser import OSTicketBrowser
     "config_path",
     type=click.Path(exists=False),
     default=None,
-    help="Path to configuration file. Defaults to config.yaml in script directory.",
+    help="Path to the YAML configuration file (required in practice; see README).",
 )
 @click.option(
     "--no-headless",
@@ -69,6 +69,7 @@ def list_tickets(ctx, status: str, user: Optional[str]) -> None:
     """
     List tickets from OSTicket.
 
+    \b
     Examples:
         ostickethelper list
         ostickethelper list --status open
@@ -121,14 +122,17 @@ def read(ctx, ticket_ids: tuple[str, ...], no_pdf: bool,
     """
     Read one or more tickets, download attachments, and generate PDF receipts.
 
-    TICKET_IDS can be ticket numbers (e.g., 656694) or internal IDs.
+    TICKET_IDS are internal ticket IDs: the [id=...] shown by `list`, as in
+    tickets.php?id=... (not the visible ticket number).
 
-    PDF receipts are saved to inbox/<id>.pdf for manual review.
+    Writes inbox_dir/<id>/ticket.json and the attachments, and the PDF receipt
+    to inbox_dir/<id>.pdf.
 
+    \b
     Examples:
-        ostickethelper read 656694
-        ostickethelper read 656694 656695
-        ostickethelper read 656694 --no-pdf
+        ostickethelper read 3295
+        ostickethelper read 3295 3296
+        ostickethelper read 3295 --no-pdf
     """
     try:
         app_config = load_config(ctx.obj["config_path"])
@@ -212,11 +216,14 @@ def read(ctx, ticket_ids: tuple[str, ...], no_pdf: bool,
 @click.pass_context
 def resolve(ctx, ticket_ids: tuple[str, ...], message: str) -> None:
     """
-    Resolve one or more tickets with a message.
+    Resolve one or more tickets with a message (emailed to the user).
 
+    TICKET_IDS are internal ticket IDs, as shown by `list` ([id=...]).
+
+    \b
     Examples:
-        ostickethelper resolve 656694 --message "Paid"
-        ostickethelper resolve 656694 656695 --message "Resolved 25.1.2026"
+        ostickethelper resolve 3295 --message "Paid"
+        ostickethelper resolve 3295 3296 --message "Resolved 25.1.2026"
     """
     try:
         app_config = load_config(ctx.obj["config_path"])
@@ -258,11 +265,13 @@ def batch(ctx, actions_file: str, dry_run: bool) -> None:
     """
     Run many ticket actions with a single login (one password decryption).
 
-    ACTIONS_FILE is a YAML list of {ticket, action, message} items, where action is
+    ACTIONS_FILE is a YAML list of {ticket, action, message} items, where ticket is
+    the internal ID shown by `list` ([id=...]) and action is
     reply (status unchanged), resolve, close, or note (internal, not sent to the user).
     The whole file is validated before logging in. A failing action does not stop
     the batch; the exit code is 1 if any action failed.
 
+    \b
     Examples:
         ostickethelper batch actions.yaml --dry-run
         ostickethelper batch actions.yaml

@@ -237,7 +237,6 @@ class TestLoadConfig:
                 "username": "admin",
                 "secrets_file": "secrets/osticket-password.txt.gpg",
                 "inbox_dir": "my/inbox",
-                "receipts_dir": "my/receipts",
                 "temp_dir": "my/tmp",
                 "logo_path": "resources/logo.png",
             }
@@ -251,7 +250,6 @@ class TestLoadConfig:
         result = load_config(str(config_file), work_dir=tmp_path)
         resolved = tmp_path.resolve()
         assert result.osticket.inbox_dir == str(resolved / "my/inbox")
-        assert result.osticket.receipts_dir == resolved / "my/receipts"
         assert result.osticket.temp_dir == resolved / "my/tmp"
         assert result.osticket.logo_path == resolved / "resources/logo.png"
 
@@ -377,3 +375,23 @@ class TestBrowserChannel:
 
         result = load_config(str(config_file), work_dir=tmp_path)
         assert result.osticket.browser_channel == "chrome"
+
+
+class TestWorkDirFromConfig:
+    def test_relative_paths_resolve_against_configured_work_dir(self, tmp_path, monkeypatch):
+        base = tmp_path / "osticket"
+        (base / "secrets").mkdir(parents=True)
+        (base / "secrets" / "pw.txt").write_text("from-file\n")
+        config_file = tmp_path / "config.yaml"
+        _write_yaml(config_file, {"osticket": {
+            "url": "https://example.com", "username": "admin",
+            "work_dir": str(base), "secrets_file": "secrets/pw.txt", "inbox_dir": "inbox",
+        }})
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        monkeypatch.delenv("OSTICKET_PASSWORD", raising=False)
+
+        result = load_config(str(config_file))
+        assert result.osticket.password == "from-file"
+        assert result.osticket.inbox_dir == str(base.resolve() / "inbox")
