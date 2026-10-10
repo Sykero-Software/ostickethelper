@@ -58,10 +58,10 @@ class OSTicketBrowser:
 
     def __enter__(self):
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
-            headless=self.config.headless,
-            slow_mo=self.config.slow_mo,
-        )
+        launch_options = {"headless": self.config.headless, "slow_mo": self.config.slow_mo}
+        if self.config.browser_channel:
+            launch_options["channel"] = self.config.browser_channel
+        self._browser = self._playwright.chromium.launch(**launch_options)
         self._context = self._browser.new_context()
         self._page = self._context.new_page()
         self._login()

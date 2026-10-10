@@ -360,3 +360,20 @@ class TestPasswordSources:
 
         with pytest.raises(FileNotFoundError, match="Secrets file not found"):
             load_config(str(config_file), work_dir=tmp_path)
+
+
+class TestBrowserChannel:
+    def test_defaults_to_bundled_chromium(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        _write_yaml(config_file, VALID_CONFIG_PASSWORD)
+
+        result = load_config(str(config_file), work_dir=tmp_path)
+        assert result.osticket.browser_channel is None
+
+    def test_channel_read_from_config(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        data = {"osticket": {**VALID_CONFIG_PASSWORD["osticket"], "browser_channel": "chrome"}}
+        _write_yaml(config_file, data)
+
+        result = load_config(str(config_file), work_dir=tmp_path)
+        assert result.osticket.browser_channel == "chrome"

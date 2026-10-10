@@ -22,6 +22,8 @@ class OSTicketConfig:
     headless: bool
     inbox_dir: str
     slow_mo: int = 0
+    # Playwright browser channel ("chrome", "msedge", ...); None = Playwright's bundled Chromium
+    browser_channel: Optional[str] = None
     work_dir: Path = field(default_factory=lambda: Path.cwd())
     receipts_dir: Path = field(default_factory=lambda: Path.cwd() / "receipts")
     temp_dir: Path = field(default_factory=lambda: Path.cwd() / ".tmp")
@@ -176,6 +178,7 @@ def load_config(config_path: Optional[str] = None, work_dir: Optional[Path] = No
         headless=osticket_data.get("headless", False),
         inbox_dir=str(inbox_dir),
         slow_mo=osticket_data.get("slow_mo", 0),
+        browser_channel=osticket_data.get("browser_channel"),
         work_dir=resolved_work_dir,
         receipts_dir=receipts_dir,
         temp_dir=temp_dir,

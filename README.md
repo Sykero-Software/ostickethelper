@@ -78,6 +78,7 @@ At least one of these must be configured.
 | `secrets_file` | No* | Path to password file (plain text or `.gpg`) |
 | `headless` | No | Run browser headless (default: `true`) |
 | `slow_mo` | No | Slow down browser actions in ms (default: `0`) |
+| `browser_channel` | No | Use an installed browser instead of Playwright's Chromium, e.g. `chrome` (then `playwright install chromium` is not needed) |
 | `inbox_dir` | No | Directory for downloaded tickets (default: `inbox/osticket`) |
 | `logo_path` | No | Logo image for PDF receipts (omit for no logo) |
 | `temp_dir` | No | Temporary directory for Typst compilation (default: `.tmp`) |
